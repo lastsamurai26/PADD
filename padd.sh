@@ -328,6 +328,51 @@ GetNetworkInformation() {
     fi
   fi
 
+#######################
+    if command -v vcgencmd &> /dev/null; then
+        local sys_throttle_raw
+        local sys_rev_raw
+
+        sys_throttle_raw=$(vgt=$(sudo vcgencmd get_throttled); echo "${vgt##*x}")
+
+        # Active Throttle Notice: https://bit.ly/2gnunOo
+        if [[ "$sys_throttle_raw" != "0" ]]; then
+            case "$sys_throttle_raw" in
+                *0001) thr_type="${COL_YELLOW}Under Voltage";;
+                *0002) thr_type="${COL_LIGHT_BLUE}Arm Freq Cap";;
+                *0003) thr_type="${COL_YELLOW}UV${COL_DARK_GRAY},${COL_NC} ${COL_LIGHT_BLUE}AFC";;
+                *0004) thr_type="${COL_LIGHT_RED}Throttled";;
+                *0005) thr_type="${COL_YELLOW}UV${COL_DARK_GRAY},${COL_NC} ${COL_LIGHT_RED}TT";;
+                *0006) thr_type="${COL_LIGHT_BLUE}AFC${COL_DARK_GRAY},${COL_NC} ${COL_LIGHT_RED}TT";;
+                *0007) thr_type="${COL_YELLOW}UV${COL_DARK_GRAY},${COL_NC} ${COL_LIGHT_BLUE}AFC${COL_DARK_GRAY},${COL_NC} ${COL_LIGHT_RED}TT";;
+            esac
+        [[ -n "$thr_type" ]] && sys_throttle="$thr_type${COL_DARK_GRAY}"
+        fi
+
+sys_rev_raw=$(awk '/Revision/ {print $3}' < /proc/cpuinfo)
+        case "$sys_rev_raw" in
+            000[2-6]) sys_model=" 1, Model B";; # 256MB
+            000[7-9]) sys_model=" 1, Model A";; # 256MB
+            000d|000e|000f) sys_model=" 1, Model B";; # 512MB
+            0010|0013) sys_model=" 1, Model B+";; # 512MB
+            0012|0015) sys_model=" 1, Model A+";; # 256MB
+            a0104[0-1]|a21041|a22042) sys_model=" 2, Model B";; # 1GB
+            900021) sys_model=" 1, Model A+";; # 512MB
+            900032) sys_model=" 1, Model B+";; # 512MB
+            90009[2-3]|920093) sys_model=" Zero";; # 512MB
+            9000c1) sys_model=" Zero W";; # 512MB
+            a02082|a[2-3]2082) sys_model=" 3, Model B";; # 1GB
+            a020d3) sys_model=" 3, Model B+";; # 1GB
+            *) sys_model="";;
+        esac
+        sys_type="Raspberry Pi$sys_model"
+    else
+        source "/etc/os-release"
+        CODENAME=$(sed 's/[()]//g' <<< "${VERSION/* /}")
+        sys_type="${NAME/ */} ${CODENAME^} $VERSION_ID"
+    fi
+#################
+
   # Get the DNS count (from pihole -c)
   dns_count="0"
   [[ -n "${PIHOLE_DNS_1}" ]] && dns_count=$((dns_count+1))
@@ -604,11 +649,11 @@ GetVersionInformation() {
       echo "web_version_heatmap=$web_version_heatmap"
 
       echo "ftl_version=$ftl_version"
-      echo "ftl_version_latest=$ftl_version_latest"       
+      echo "ftl_version_latest=$ftl_version_latest"
       echo "ftl_version_heatmap=$ftl_version_heatmap"
 
       echo "padd_version=$padd_version"
-      echo "padd_version_latest=$padd_version_latest"       
+      echo "padd_version_latest=$padd_version_latest"
       echo "padd_version_heatmap=$padd_version_heatmap"
 
       echo "version_status=\"$version_status\""
@@ -617,8 +662,9 @@ GetVersionInformation() {
 
       echo "pico_status=\"$pico_status\""
       echo "mini_status_=\"$mini_status_\""
-      echo "tiny_status_=\"$tiny_status_\""        
+      echo "tiny_status_=\"$tiny_status_\""
       echo "full_status_=\"$full_status_\""
+      echo "mega_status=\"$mega_status\""
     } >> ./piHoleVersion
 
     # there's a file now
@@ -722,7 +768,7 @@ PrintNetworkInformation() {
     fi
   else
     CleanEcho "${bold_text}NETWORK =======================================================================${reset_text}"
-    CleanPrintf " %-10s%-19s\e[0K\\n" "Hostname:" "${full_hostname}"
+    CleanPrintf " %-10s%-19s\e[0K\\n" "Hostname:" "${full_hostname}" "Model:" "${sys_type}"
     CleanPrintf " %-6s%-19s %-10s%-29s\e[0K\\n" "IPv4:" "${pi_ip4_addr}" "IPv6:" "${pi_ip6_addr}"
     CleanEcho "DNS ==========================================================================="
     CleanPrintf " %-10s%-39s\e[0K\\n" "Servers:" "${dns_information}"
