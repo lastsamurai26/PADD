@@ -319,14 +319,14 @@ GetNetworkInformation() {
   fi
 
 #######################
-    if command -v vcgencmd &> /dev/null; then
+    if command -v vcgencmd >/dev/null 2>&1; then
         local sys_throttle_raw
         local sys_rev_raw
 
         sys_throttle_raw=$(vgt=$(sudo vcgencmd get_throttled); echo "${vgt##*x}")
 
         # Active Throttle Notice: https://bit.ly/2gnunOo
-        if [[ "$sys_throttle_raw" != "0" ]]; then
+        if [ "$sys_throttle_raw" != "0" ]; then
             case "$sys_throttle_raw" in
                 *0001) thr_type="${COL_YELLOW}Under Voltage";;
                 *0002) thr_type="${COL_LIGHT_BLUE}Arm Freq Cap";;
@@ -336,7 +336,7 @@ GetNetworkInformation() {
                 *0006) thr_type="${COL_LIGHT_BLUE}AFC${COL_DARK_GRAY},${COL_NC} ${COL_LIGHT_RED}TT";;
                 *0007) thr_type="${COL_YELLOW}UV${COL_DARK_GRAY},${COL_NC} ${COL_LIGHT_BLUE}AFC${COL_DARK_GRAY},${COL_NC} ${COL_LIGHT_RED}TT";;
             esac
-        [[ -n "$thr_type" ]] && sys_throttle="$thr_type${COL_DARK_GRAY}"
+        [ -n "$thr_type" ] && sys_throttle="$thr_type${COL_DARK_GRAY}"
         fi
 
 sys_rev_raw=$(awk '/Revision/ {print $3}' < /proc/cpuinfo)
@@ -357,9 +357,14 @@ sys_rev_raw=$(awk '/Revision/ {print $3}' < /proc/cpuinfo)
         esac
         sys_type="Raspberry Pi$sys_model"
     else
-        source "/etc/os-release"
-        CODENAME=$(sed 's/[()]//g' <<< "${VERSION/* /}")
-        sys_type="${NAME/ */} ${CODENAME^} $VERSION_ID"
+        . "/etc/os-release"
+        # remove parenthesis and only print second substring
+        CODENAME=$(echo "${VERSION}"| sed 's/[()]//g' | awk '{print $2}')
+
+        # only print first substring of NAME and make first character of CODENAME uppercase
+        sys_type=$(echo "${NAME}" | awk '{print $1}')
+        CODENAME=$(echo "$CODENAME" | sed 's/./\U&/')
+        sys_type="${sys_type} ${CODENAME} $VERSION_ID"
     fi
 #################
 
